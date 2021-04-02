@@ -1,0 +1,12 @@
+"https://www.{default}/":
+  type: upstream
+  id: matomo
+  upstream: "app:http"
+  cache:
+    # Enable platform.sh cache when launch
+    enabled: false
+    default_ttl: 300
+
+"https://{default}/":
+  type: redirect
+  to: "https://www.{default}/"

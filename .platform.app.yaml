@@ -1,0 +1,127 @@
+# This file describes an application. You can have multiple applications
+# in the same project.
+
+# The name of this app. Must be unique within a project.
+name: app
+
+# The type of the application to build.
+type: matomo:fpm-alpine
+
+timezone: "Europe/Stockholm"
+
+build:
+  flavor: none
+
+runtime:
+  request_terminate_timeout: 50
+  sizing_hints:
+    request_memory: 20
+  extensions:
+    - redis
+
+dependencies:
+  php:
+    composer/composer: '^2.0'
+
+variables:
+  php:
+    max_execution_time: 45
+  env:
+    # Overwrite the default TYPO3 Cache-control header with env:OVERWRITE_DEFAULT_CACHE_CONTROL_HEADER
+    OVERWRITE_DEFAULT_CACHE_CONTROL_HEADER: Cache-control:max-age=300
+
+    # uncomment env-s below if using solr
+    # SOLR_CORE_EN: 'core_en'
+    # SOLR_CORE_SV: 'core_sv'
+    # SOLR_CORE_DE: 'core_de'
+    # SOLR_CORE_NO: 'core_no'
+    # SOLR_CORE_DA: 'core_da'
+    # SOLR_CORE_FR: 'core_fr'
+    # SOLR_HOST_MAIN: 'solrmain.internal'
+    # SOLR_HOST_SITE2: 'solrsite2.internal'
+    # SOLR_PORT: '8080'
+
+# The relationships of the application with services or other applications.
+# The left-hand side is the name of the relationship as it will be exposed
+# to the application in the PLATFORM_RELATIONSHIPS variable. The right-hand
+# side is in the form `<service name>:<endpoint name>`.
+relationships:
+  database: 'db:mysql'
+  rediscache: 'cache:redis'
+  # -SOLR- uncomment if using solr
+  # solrmain: 'solrsearch:main'
+  # solrsite2: 'solrsearch:site2'
+
+# The configuration of app when it is exposed to the web.
+web:
+  locations:
+    '/':
+      root: 'public'
+      passthru: '/index.php'
+      index:
+        - 'index.php'
+      allow: false
+      headers:
+        X-Content-Type-Options: nosniff
+      rules:
+        '^\/typo3conf\/ext\/.*\/Resources\/Public\/assets\/development\/?.*\.(css|js)$':
+          allow: true
+          passthru: false
+          scripts: false
+          expires: -1
+        '^\/typo3conf\/ext\/.*\/Resources\/Public\/assets\/production\/?.*\.(css|js)$':
+          allow: true
+          passthru: false
+          scripts: false
+          expires: 1y
+        '\.(jpe?g|png|gif|svgz?|html|css|js|map|ico|bmp|eot|woff2?|otf|ttf|webmanifest|xsl)$':
+          allow: true
+          passthru: false
+          scripts: false
+          expires: 1M
+        # Disallow access to:
+        '^/(wp-login\.php|wp-login|login\.php|wp-content|wp-admin|wp-cofigs\.php|wp-pot\.php|wp-404\.php|xmlrpc\.php|wp-load\.php|wp-json|cgi|CGI|home\.php|seo-joy\.cgi|light\.cgi|gastenboek\.php|bbs\.cgi|aska\.cgi|jax_guestbook\.php|wp/|phpmyadmin|phpMyAdmin|pma|sql|default\.htm|index\.html|backup|bitcoin|admin\.php|autodiscover/autodiscover\.xml)':
+          scripts: false
+          allow: false
+          passthru: false
+        '(/tel:|test\.php|modules\.php|install\.php)':
+          scripts: false
+          allow: false
+          passthru: false
+        '\.(asp|aspx|esp|cgi|dat)$':
+          scripts: false
+          allow: false
+          passthru: false
+
+# The size of the persistent disk of the application (in MB).
+disk: 2048
+
+# The mounts that will be performed when the package is deployed.
+mounts:
+  #somehow add config.php.ini file here instead of HOOK
+  "public/typo3temp":
+    source: local
+    source_path: "typo3temp"
+
+# The hooks that will be performed when the package is deployed.
+hooks:
+  build: |
+    # copy the php config file to MATOMO app here
+  deploy: |
+    # do somehting with services
+
+crons:
+  backup:
+    # Take a backup automatically every night at 2 am (UTC).
+    spec: '0 2 * * *'
+    cmd: |
+      if [ "$PLATFORM_BRANCH" = master ]; then
+        platform backup:create --yes --no-wait
+      fi
+  renewcert:
+    # Force a redeploy at 5 am (UTC) on the 1st and 15th of every month.
+    spec: '0 5 1,15 * *'
+    cmd: |
+      if [ "$PLATFORM_BRANCH" = master ]; then
+        platform redeploy --yes --no-wait
+      fi
